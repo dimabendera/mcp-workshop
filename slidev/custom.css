@@ -1,0 +1,47 @@
+/* RIA brand: #158158 green, Arial font */
+
+:root {
+  --ria-green: #158158;
+  --ria-green-light: #1aa368;
+}
+
+.slidev-layout h1 {
+  color: var(--ria-green) !important;
+  font-family: Arial, sans-serif;
+}
+
+.slidev-layout h2,
+.slidev-layout h3 {
+  font-family: Arial, sans-serif;
+}
+
+/* Cover slide title stays white */
+.slidev-layout.cover h1,
+.slidev-layout.cover h2 {
+  color: #ffffff !important;
+}
+
+/* Step/workshop cover titles */
+.slidev-layout.cover h1 {
+  color: #ffffff !important;
+}
+
+/* Code highlight accent */
+.shiki .highlighted {
+  border-left: 3px solid var(--ria-green);
+}
+
+/* Mermaid diagrams — prevent overflow */
+.slidev-layout .mermaid svg {
+  max-height: 340px;
+  width: auto !important;
+  max-width: 100%;
+}
+
+/* Ensure logo space — don't let content clip under logo */
+.slidev-layout {
+  padding-right: 80px;
+}
+.slidev-layout.cover {
+  padding-right: 0;
+}
