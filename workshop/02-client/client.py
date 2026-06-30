@@ -6,7 +6,7 @@ from mcp.client.stdio import stdio_client
 async def main():
     params = StdioServerParameters(
         command="python",
-        args=["../01-server/server.py"]
+        args=["./01-server/server.py"]
     )
 
     async with stdio_client(params) as (read, write):

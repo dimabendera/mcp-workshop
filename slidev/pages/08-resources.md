@@ -1,103 +1,3 @@
----
-layout: center
----
-
-# Просунуті теми (швидкий огляд)
-
----
-
-# Контекстна інженерія для Tools
-
-**Опис tool = prompt для LLM.** Якість опису впливає на рішення агента.
-
-<div grid="~ cols-2 gap-6">
-<div>
-
-**Погано:**
-```js
-server.tool("query_db", { sql: z.string() }, ...)
-// Опис: "Query database"
-// → LLM не знає коли використовувати
-```
-
-</div>
-<div>
-
-**Добре:**
-```js
-server.tool(
-  "search_users",
-  {
-    query: z.string().describe(
-      "Пошуковий запит — ім'я або email"
-    ),
-  },
-  // Опис: "Шукає користувачів по імені або email.
-  //  Використовуй коли питають про конкретну людину
-  //  або потрібні контактні дані."
-  handler
-)
-```
-
-</div>
-</div>
-
----
-
-# Скільки Tools підключати?
-
-| Кількість | Ефект |
-|-----------|-------|
-| 1–20 | Оптимально, LLM легко вибирає |
-| 20–50 | Зростають витрати токенів на контекст |
-| 50+ | LLM може плутатись, повільніше |
-
-<v-click>
-
-**Рішення для великих систем:** RAG для інструментів
-
-```
-Запит → векторний пошук по описах tools → топ-5 релевантних → LLM
-```
-
-Замість передавати всі 100+ tools — передаємо тільки найбільш схожі до запиту.
-
-</v-click>
-
----
-
-# RAG для інструментів — як це працює
-
-**RAG-MCP (arxiv 2025):** зменшує prompt на 50%, точність вибору tools ×3
-
-```
-┌─ Всі tools у векторній БД ──────────────────────────────────┐
-│  add(a,b)       → "складає два числа..."                    │
-│  search_users() → "шукає користувача по імені або email..." │
-│  send_email()   → "відправляє email на вказану адресу..."   │
-│  ... 100+ more ...                                          │
-└─────────────────────────────────────────────────────────────┘
-           ↓  запит користувача
-┌─ Semantic Search ───────────────────────────────────────────┐
-│  "Скільки буде 15 + 27?"                                    │
-│  → cosine similarity по embeddings                          │
-│  → топ-5 релевантних: [ add, multiply, subtract, ... ]     │
-└─────────────────────────────────────────────────────────────┘
-           ↓  тільки топ-5 → LLM  (замість 100+)
-```
-
-<v-click>
-
-```js
-// ChromaDB + LangChain
-const relevantTools = await vectorStore.similaritySearch(userQuery, 5);
-const agent = createReactAgent({ llm, tools: relevantTools });
-```
-
-</v-click>
-
----
-
 # Ресурси для подальшого вивчення
 
 <div grid="~ cols-2 gap-8">
@@ -105,15 +5,14 @@ const agent = createReactAgent({ llm, tools: relevantTools });
 
 **Офіційні:**
 - `modelcontextprotocol.io` — специфікація
-- `spec.modelcontextprotocol.io` — детальна документація
-- `github.com/modelcontextprotocol` — офіційні SDK
-- `github.com/microsoft/mcp-for-beginners` — навчальний курс
+- `spec.modelcontextprotocol.io` — документація
+- `github.com/modelcontextprotocol` — SDK
+- `microsoft/mcp-for-beginners` — навчальний курс
 
 **SDK:**
 - `@modelcontextprotocol/sdk` (JS/TS)
 - `mcp[cli]` (Python, fastmcp)
-- `langchain-mcp-adapters` (Python + LangChain)
-- `@langchain/mcp-adapters` (JS + LangChain)
+- `langchain-mcp-adapters` / `@langchain/mcp-adapters`
 
 </div>
 <div>

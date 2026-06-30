@@ -97,3 +97,36 @@ graph LR
 Важливо: MCP НЕ є офіційним стандартом IEEE/IETF, але де-факто став стандартом для AI інтеграцій.
 Майже всі major IDE і AI-інструменти вже підтримують MCP (VS Code, Cursor, Cline, JetBrains...).
 -->
+
+---
+
+# JSON-RPC 2.0 — транспортний протокол MCP
+
+Всі повідомлення між клієнтом і сервером — три типи:
+
+<div style="transform:scale(0.78); transform-origin:top center; margin-top:-16px; margin-bottom:-110px">
+
+```mermaid
+sequenceDiagram
+  participant C as 🤖 Client (Host)
+  participant S as 🔧 MCP Server
+
+  Note over C,S: 1. Request — клієнт надсилає, чекає відповіді (є id)
+  C->>S: {"jsonrpc":"2.0", "id":1, "method":"tools/call", "params":{...}}
+  S-->>C: {"jsonrpc":"2.0", "id":1, "result":{...}}
+  S-->>C: {"jsonrpc":"2.0", "id":1, "error":{"code":-32601, "message":"Not found"}}
+
+  Note over C,S: 2. Notification — без id, відповідь не очікується
+  S-)C: {"jsonrpc":"2.0", "method":"notifications/tools/list_changed"}
+```
+
+</div>
+
+> **SDK ховає цей рівень** — ти пишеш `server.tool(...)`, а не JSON вручну
+
+<!--
+JSON-RPC 2.0 — стандарт 2010 року, використовується в LSP (Language Server Protocol) і тепер в MCP.
+id зв'язує запит із відповіддю — важливо для асинхронного виконання.
+Notification (без id) — одностороннє сповіщення, відповідь не очікується.
+В MCP Inspector можна побачити ці повідомлення в реальному часі.
+-->

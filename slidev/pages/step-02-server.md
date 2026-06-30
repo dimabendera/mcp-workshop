@@ -2,193 +2,70 @@
 layout: cover
 ---
 
-# 🖥️ Крок 1
-## Перший MCP Сервер
+# 🖥️ Крок 1 — Перший MCP сервер
 
-Файл: `workshop/01-server/server.starter.js`
+`workshop/01-server/server.js`
 
 <!--
-Відкрийте server.starter.js на великому екрані.
-Будемо розкоментовувати по кроку разом.
+Відкрийте server.js на великому екрані.
+Там є детальні коментарі — читаємо разом по частинах.
 -->
 
 ---
 
-# Що будуємо
+# З чого складається MCP сервер
 
-**Інструмент:** `add(a, b)` — просте додавання двох чисел
+```mermaid
+flowchart LR
+  A["📝 server.tool(\n  name,\n  schema,\n  handler\n)"] --> B["🖥️ McpServer"]
+  B --> C["📡 StdioTransport\nstdin / stdout"]
+  C --> D["🔍 Inspector\nабо Client"]
 
-_Чому такий простий? — щоб весь фокус був на MCP протоколі, не на логіці_
-
-<br>
-
-**Принцип:** оголошуємо інструмент → підключаємо транспорт → готово
-
+  style A fill:#1e3a5f,color:#fff
+  style B fill:#4c1d95,color:#fff
+  style C fill:#065f46,color:#fff
 ```
-server.tool(name, schema, handler)
-         ↓
-StdioServerTransport
-         ↓
-server.connect(transport)
-```
+
+**Інструмент = 3 частини:**
+
+| Частина | Що це | Навіщо |
+|---------|-------|--------|
+| `name` | рядок-ідентифікатор | LLM викликає по назві |
+| `schema` | Zod-об'єкт з `.describe()` | LLM знає що передавати |
+| `handler` | async функція | ваш бізнес-код |
 
 <!--
-Наголосіть: логіка add() тривіальна спеціально.
-В реальних проектах handler буде викликати БД, API, файлову систему.
-Принцип підключення — ідентичний.
+Відкрийте файл і показуйте по частинах.
 -->
 
 ---
-layout: two-cols
----
 
-# Крок 1.1 — Імпорти та ініціалізація
+# Запускаємо
 
-```js
-// server.js — Перший MCP сервер
+```bash
+# В папці workshop/
+npm run server
+# або: node 01-server/server.js
 
-// SDK для створення MCP серверів (офіційний)
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-
-// Транспорт: stdio — спілкування через stdin/stdout
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-
-// Zod — бібліотека для валідації типів параметрів
-import { z } from "zod";
-
-// Створюємо сервер з назвою і версією
-const server = new McpServer({
-  name: "workshop",    // назва видна в Inspector і хостах
-  version: "1.0.0"
-});
+# Python версія:
+python 01-server/server.py
 ```
 
-::right::
+<v-click>
 
-# Python
+**Порожній термінал = сервер чекає з'єднань ✅**
 
-```python
-# server.py — Python версія
+Сервер читає JSON-RPC з stdin і відповідає в stdout.  
+Перевіримо через MCP Inspector у наступному кроці.
 
-# FastMCP — спрощена обгортка над офіційним SDK
-from mcp.server.fastmcp import FastMCP
-
-# Створюємо сервер (FastMCP замінює 10+ рядків ініціалізації)
-mcp = FastMCP("workshop")
-```
-
-<br>
-
-**Різниця:** Python FastMCP — це обгортка яка робить все за 2 рядки. JS SDK — більш явний, видно кожен крок.
+</v-click>
 
 <!--
-Покажіть обидва файли: server.js і server.py.
-FastMCP — зручна бібліотека, але під капотом той самий протокол.
--->
+Покажіть що після запуску термінал "завис" — це нормально.
+Сервер живе і чекає поки до нього підключиться клієнт або Inspector.
 
----
-layout: two-cols
----
-
-# Крок 1.2 — Оголошуємо інструмент
-
-```js {all|2|3-6|7-9|all}
-server.tool(
-  "add",                      // 1. Назва (LLM вирішує по ній і опису)
-  {
-    a: z.number().describe("Перше число"),   // 2. Схема параметрів
-    b: z.number().describe("Друге число"),   //    .describe() → LLM підказка
-  },
-  async ({ a, b }) => ({      // 3. Функція виконання
-    content: [{ type: "text", text: String(a + b) }]  // Результат
-  })
-);
-```
-
-::right::
-
-# Python
-
-```python
-@mcp.tool()
-def add(a: int, b: int) -> int:
-    """Додає два числа і повертає результат.
-    
-    LLM читає цей docstring щоб вирішити
-    чи потрібен цей інструмент.
-    """
-    return a + b
-```
-
-<br>
-
-- Декоратор `@mcp.tool()` = `server.tool()`
-- Назва = ім'я функції
-- Типи = схема параметрів
-- Docstring = опис для LLM
-
-<!--
-Підкресліть: .describe() і docstring — це підказки для LLM!
-Чим точніший опис — тим краще LLM вирішує КОЛИ використовувати цей інструмент.
--->
-
----
-layout: two-cols
----
-
-# Крок 1.3 — Підключаємо транспорт
-
-```js
-// stdio транспорт: сервер читає stdin, пише в stdout
-const transport = new StdioServerTransport();
-
-// Підключаємо і запускаємо (сервер тепер слухає)
-await server.connect(transport);
-```
-
-**Весь файл — 15 рядків:**
-
-```js
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { z } from "zod";
-
-const server = new McpServer({ name: "workshop", version: "1.0.0" });
-
-server.tool(
-  "add",
-  { a: z.number().describe("Перше число"), b: z.number().describe("Друге число") },
-  async ({ a, b }) => ({ content: [{ type: "text", text: String(a + b) }] })
-);
-
-const transport = new StdioServerTransport();
-await server.connect(transport);
-```
-
-::right::
-
-# Python
-
-```python
-mcp.run()  # stdio за замовчуванням
-```
-
-**Весь файл — 10 рядків:**
-
-```python
-from mcp.server.fastmcp import FastMCP
-
-mcp = FastMCP("workshop")
-
-@mcp.tool()
-def add(a: int, b: int) -> int:
-    """Додає два числа і повертає результат."""
-    return a + b
-
-mcp.run()
-```
-
-<!--
-Зверніть увагу: JS -- явний await server.connect(transport). Python -- mcp.run() ховає деталі.
-Обидва варіанти правильні. JS дає більше контролю, Python -- простіше.
+JS vs Python:
+  JS:  server.tool(name, schema, fn) + StdioServerTransport + server.connect
+  Python: @mcp.tool() + def + docstring + mcp.run()
+Концепції ті самі, синтаксис різний. FastMCP ховає більше деталей.
 -->

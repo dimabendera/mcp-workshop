@@ -8,7 +8,8 @@ const server = new McpServer({
 });
 
 server.tool(
-  "add",
+    "add",
+    "Add two numbers",
   {
     a: z.number().describe("Перше число"),
     b: z.number().describe("Друге число"),

@@ -1,30 +1,32 @@
-// agent-traced.js — LangChain агент з Langfuse трасуванням
-// Різниця від agent.js: тільки 3 нових рядки
+// LangChain агент з Langfuse трасуванням
+// Різниця від agent.js — тільки 3 рядки (імпорт + ініціалізація + callbacks)
+// Запуск: npm run traced
 
 import "dotenv/config";
 import { MultiServerMCPClient } from "@langchain/mcp-adapters";
 import { ChatOpenAI } from "@langchain/openai";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
+import { CallbackHandler } from "langfuse-langchain"; // ← 1. Новий імпорт
 
-// НОВИЙ ІМПОРТ: Langfuse callback handler для LangChain
-import { CallbackHandler } from "langfuse-langchain";
-
-// НОВА ІНІЦІАЛІЗАЦІЯ: handler читає ключі з .env
+// 2. Langfuse handler — читає ключі з .env автоматично
 const langfuseHandler = new CallbackHandler({
   publicKey: process.env.LANGFUSE_PUBLIC_KEY,
   secretKey: process.env.LANGFUSE_SECRET_KEY,
   baseUrl: process.env.LANGFUSE_BASEURL,
-  // sessionId: "workshop-session-1",  // опційно — для групування traces
-  // userId: "user@example.com",       // опційно — для аналітики по юзерам
 });
 
 // Все те саме що в agent.js ↓
 const mcpClient = new MultiServerMCPClient({
   mcpServers: {
-    workshop: {
+    math: {
       transport: "stdio",
       command: "node",
-      args: ["../01-server/server.js"],
+      args: ["./01-server/server.js"],
+    },
+    autoria: {
+      transport: "stdio",
+      command: "node",
+      args: ["./02-server/server.js"],
     },
   },
 });
@@ -32,22 +34,21 @@ const mcpClient = new MultiServerMCPClient({
 const tools = await mcpClient.getTools();
 
 const llm = new ChatOpenAI({
-  openAIApiKey: process.env.LITELLM_API_KEY,
+  apiKey: process.env.LITELLM_API_KEY,
   configuration: { baseURL: process.env.LITELLM_BASE_URL },
   model: process.env.LLM_MODEL,
 });
 
 const agent = createReactAgent({ llm, tools });
 
-// ЄДИНА ЗМІНА В ВИКЛИКУ: додаємо { callbacks: [langfuseHandler] }
+// 3. Єдина зміна при виклику — callbacks: [langfuseHandler]
 const result = await agent.invoke(
-  { messages: [{ role: "user", content: "Скільки буде 15 + 27?" }] },
+  { messages: [{ role: "user", content: "Порахуй за допомогою інструмента add 34+12+56" }] },
   { callbacks: [langfuseHandler] }  // ← ось і все трасування
 );
 
 console.log(result.messages.at(-1).content);
 
-// ВАЖЛИВО: flush надсилає дані в Langfuse перед завершенням процесу
+// Важливо: flush надсилає дані в Langfuse перед завершенням процесу
 await langfuseHandler.flushAsync();
-
 await mcpClient.close();

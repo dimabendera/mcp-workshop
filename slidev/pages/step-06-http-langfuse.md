@@ -1,149 +1,76 @@
-## `workshop/04-http-server/server-http.js`
+# Langfuse — навіщо і як
 
-```js {maxHeight:'420px'}
-// server-http.js — MCP сервер на HTTP транспорті
+**Проблема:** LangChain ховає деталі виконання → важко зрозуміти що відбулось.
 
-import "dotenv/config";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import express from "express";
-import { z } from "zod";
+**Рішення:** Langfuse показує всі кроки агента в реальному часі.
 
-// Той самий сервер що і в 01-server/ -- нічого не змінилось!
-const server = new McpServer({ name: "workshop-http", version: "1.0.0" });
-
-server.tool(
-  "add",
-  { a: z.number().describe("Перше число"), b: z.number().describe("Друге число") },
-  async ({ a, b }) => ({ content: [{ type: "text", text: String(a + b) }] })
-);
-
-// HTTP шар з авторизацією
-const app = express();
-app.use(express.json());
-
-// Middleware: перевіряємо Bearer token
-app.use((req, res, next) => {
-  const token = req.headers.authorization?.replace("Bearer ", "");
-  if (process.env.MCP_SECRET && token !== process.env.MCP_SECRET) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-  next();
-});
-
-// MCP endpoint
-app.post("/mcp", async (req, res) => {
-  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-  await server.connect(transport);
-  await transport.handleRequest(req, res, req.body);
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`MCP HTTP Server: http://localhost:${PORT}/mcp`));
+```bash
+npm run traced   # запустить agent-traced.js
 ```
+
+**Що побачите в dashboard:**
+- Кожен виклик tool: назва, параметри, результат, latency
+- Всі LLM запити: prompt, відповідь, кількість токенів, ціна
+- Загальний trace: від запиту до відповіді — де витрачається час
+
+> **Чому це важливо:** LLM — недетермінований.  
+> Без логів неможливо зрозуміти чому агент прийняв неправильне рішення.
 
 <!--
-Запустіть: node server-http.js
-Потім в Inspector: Transport = HTTP, URL = http://localhost:3000/mcp
+Відкрийте Langfuse dashboard поки студенти запускають npm run traced.
+Покажіть trace в реальному часі — достатньо 2-3 хвилини.
+LangChain як будь-який high-level фреймворк ховає деталі → Langfuse їх відкриває.
+Показати: tool calls, LLM calls, latency breakdown, token usage.
 -->
-
----
-
-# Bearer Token — перевірка через curl
-
-Встановіть в `.env`:
-
-```bash
-MCP_SECRET=my-super-secret-token
-```
-
-```bash
-# Без токену — 401 Unauthorized
-curl -X POST http://localhost:3000/mcp \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
-# → {"error":"Unauthorized"}
-
-# З Bearer token — 200 OK
-curl -X POST http://localhost:3000/mcp \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer my-super-secret-token" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
-# → {"result":{"tools":[{"name":"add",...}]}}
-```
-
-<v-click>
-
-**Клієнт або VS Code `mcp.json`:**
-```json
-{
-  "servers": {
-    "my-server": {
-      "type": "http",
-      "url": "http://10.0.0.5:3000/mcp",
-      "headers": { "Authorization": "Bearer my-super-secret-token" }
-    }
-  }
-}
-```
-
-</v-click>
 
 ---
 
 ## `workshop/05-langfuse/agent-traced.js`
 
 ```js {maxHeight:'420px'}
-// agent-traced.js — LangChain агент з Langfuse трасуванням
+// agent-traced.js — той самий agent.js + 3 рядки для Langfuse
 
 import "dotenv/config";
 import { MultiServerMCPClient } from "@langchain/mcp-adapters";
 import { ChatOpenAI } from "@langchain/openai";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
-import { CallbackHandler } from "langfuse-langchain"; // ← єдиний новий імпорт
+import { CallbackHandler } from "langfuse-langchain"; // ← 1. новий імпорт
 
-// Langfuse handler (читає ключі з .env)
+// 2. Langfuse handler
 const langfuseHandler = new CallbackHandler({
   publicKey: process.env.LANGFUSE_PUBLIC_KEY,
   secretKey: process.env.LANGFUSE_SECRET_KEY,
   baseUrl: process.env.LANGFUSE_BASEURL,
 });
 
-// Все те саме що в agent.js
+// Все те саме що в agent.js ↓
 const mcpClient = new MultiServerMCPClient({
   mcpServers: {
-    workshop: {
-      transport: "stdio",
-      command: "node",
-      args: ["../01-server/server.js"],
-    },
+    math: { transport: "stdio", command: "node", args: ["../01-server/server.js"] },
+    autoria: { transport: "stdio", command: "node", args: ["../02-server/server.js"] },
   },
 });
-
 const tools = await mcpClient.getTools();
-
 const llm = new ChatOpenAI({
-  openAIApiKey: process.env.LITELLM_API_KEY,
+  apiKey: process.env.LITELLM_API_KEY,
   configuration: { baseURL: process.env.LITELLM_BASE_URL },
   model: process.env.LLM_MODEL,
 });
-
 const agent = createReactAgent({ llm, tools });
 
-// ЄДИНА ЗМІНА: додаємо callbacks: [langfuseHandler]
+// 3. Єдина зміна при виклику — callbacks: [langfuseHandler]
 const result = await agent.invoke(
-  { messages: [{ role: "user", content: "Скільки буде 15 + 27?" }] },
-  { callbacks: [langfuseHandler] }  // ← ось і все трасування
+  { messages: [{ role: "user", content: "Знайди BMW X5 дизель до 20000 доларів" }] },
+  { callbacks: [langfuseHandler] }  // ← ось і все
 );
 
 console.log(result.messages.at(-1).content);
-
-// Важливо: flush перед завершенням (надсилає дані в Langfuse)
 await langfuseHandler.flushAsync();
 await mcpClient.close();
 ```
 
 <!--
-Порівняйте з agent.js -- різниця тільки в 3 рядках: імпорт, ініціалізація, callbacks.
-Покажіть Langfuse dashboard після запуску.
+Порівняйте з agent.js — різниця тільки в 3 місцях: імпорт, ініціалізація, callbacks.
+Все решта ідентично. flushAsync() — важливо: без нього дані можуть не дійти до Langfuse.
+Показати в Langfuse dashboard: tools/list call, tool_use виклик, final answer.
 -->

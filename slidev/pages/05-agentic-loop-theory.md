@@ -42,7 +42,7 @@ LLM: "Зараз у Києві 18°C, хмарно."
 
 # ReAct: Think → Act → Observe
 
-**Патерн ReAct** — основа агентік лупу:
+**Патерн ReAct** — єдиний стандартний патерн для AI агентів сьогодні:
 
 ```mermaid
 flowchart LR
@@ -58,27 +58,55 @@ flowchart LR
     D -->|Так| R["✅ Відповідь\n15 + 27 = 42"]
 ```
 
+<v-click>
+
+**Як LLM фізично "зупиняється":**
+
+| Крок | Що відбувається |
+|------|----------------|
+| 1. Think | LLM генерує токени... зупиняється на `tool_use` → СТОП |
+| 2. Act | Framework виконує tool (ваш код, API, БД) — LLM чекає |
+| 3. Observe | `tool_result` додається в контекст → LLM продовжує |
+
+LangChain/LangGraph реалізує цей луп автоматично через `createReactAgent`.
+
+</v-click>
+
 <!--
-ReAct = Reasoning + Acting. Класична стаття 2022 року.
-LangChain реалізує цей патерн автоматично через create_react_agent.
+ReAct = Reasoning + Acting. Класична стаття 2022 року (Yao et al., Google Brain).
+"Think-Act-Observe" = природна мова як scratchpad для reasoning.
+
+Як LLM зупиняється — деталі для тих хто питає:
+  LLM генерує токен за токеном.
+  Коли модель "вирішила" використати інструмент — вона генерує спеціальний токен tool_use.
+  stop_reason = "tool_use" → API зупиняє стрімінг і повертає tool_use block.
+  Framework (LangChain) бачить stop_reason → виконує tool → отримує result.
+  Результат додається як tool_result message → API викликається знову з повним контекстом.
+  LLM продовжує генерацію і або відповідає або знову викликає tool.
+
+Це не "паузи" — це окремі API виклики. Кожен "раунд" = новий виклик LLM API.
+Тому агент може зробити 5 tool calls = мінімум 6 API викликів (5 act + 1 final answer).
+
+Чи є ReAct єдиний патерн? Є й інші:
+  - Chain-of-Thought (CoT) — тільки думає, не діє (без інструментів)
+  - ReAct — думає і діє (з інструментами) ← основний сьогодні
+  - Multi-agent — кілька агентів делегують один одному (наступна лекція)
 -->
 
 ---
 
 # LangChain + MCP = Агент
 
-**Без LangChain** — пишемо луп вручну (while True, перевіряємо stop_reason...)
+**Без LangChain** — пишемо ReAct луп вручну (while True, перевіряємо stop_reason...)
 
-**З LangChain** — один рядок:
+**З LangChain** — `createReactAgent()` робить все:
 
-```
-MCP Server → інструменти → LangChain Agent → LiteLLM → відповідь
-```
+<div style="transform:scale(0.82); transform-origin:top center; margin-top:-8px; margin-bottom:-70px">
 
 ```mermaid
 flowchart LR
-    MCP["🔧 MCP Server\n(наш server.js)"] -->|tools| LC["🦜 LangChain\nReAct Agent"]
-    LLM["🧠 LiteLLM Proxy\n(наша модель)"] <-->|messages| LC
+    MCP["🔧 MCP Server\n(наш server.js)"] -->|tools list| LC["🦜 LangChain\nReAct Agent"]
+    LLM["🧠 LiteLLM Proxy\n(наша модель)"] <-->|API calls| LC
     User["👤 Запит"] --> LC --> Answer["✅ Відповідь"]
 
     style MCP fill:#6366f1,color:#fff
@@ -86,10 +114,11 @@ flowchart LR
     style LLM fill:#4285f4,color:#fff
 ```
 
+</div>
+
 <v-click>
 
-LangChain сам реалізує Think-Act-Observe луп.  
-Нам залишається: підключити MCP сервер і передати запит.
+LangChain реалізує ReAct луп автоматично. Нам: підключити MCP + передати запит.
 
 </v-click>
 
@@ -98,30 +127,3 @@ LangChain сам реалізує Think-Act-Observe луп.
 Покажіть що без LangChain код агенту займав ~40 рядків (while loop).
 -->
 
----
-
-# Що таке LiteLLM Proxy
-
-**LiteLLM** — API gateway який об'єднує різні LLM провайдерів під один OpenAI-сумісний API
-
-```
-LangChain              LiteLLM Proxy           Реальні моделі
-ChatOpenAI     →    http://proxy:4000/v1   →   OpenAI GPT-4
-(base_url=...)                             →   Claude
-                                           →   Mistral
-                                           →   Ваша кастомна модель
-```
-
-<v-click>
-
-LangChain не знає що там "за" LiteLLM — він думає що спілкується з OpenAI.  
-Ми просто міняємо `base_url` і `api_key`.
-
-</v-click>
-
-<!--
-Якщо є питання "навіщо LiteLLM якщо є OpenAI SDK" -- пояснити:
-1. Ми хочемо нашу внутрішню модель
-2. LiteLLM дає єдиний інтерфейс для всіх моделей
-3. Можна підключити будь-яку модель і не змінювати код агента
--->

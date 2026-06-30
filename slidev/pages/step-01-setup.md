@@ -73,27 +73,39 @@ npm install займе ~30 секунд. Чудовий момент щоб ро
 cp .env.example .env
 ```
 
-```ini
-# LiteLLM Proxy (внутрішній LLM — URL і ключ дає ведучий)
-LITELLM_BASE_URL=https://...
-LITELLM_API_KEY=sk-...
-LLM_MODEL=ria_llm_latest
+```ini {maxHeight:'220px'}
+# ── LiteLLM Proxy (внутрішній LLM) ───────────────
+LITELLM_BASE_URL=          # від ведучого
+LITELLM_API_KEY=           # від ведучого
+LLM_MODEL=                 # від ведучого
 
-# Langfuse (трасування — знадобиться в кроці 6)
-LANGFUSE_PUBLIC_KEY=pk-lf-...
-LANGFUSE_SECRET_KEY=sk-lf-...
-LANGFUSE_BASEURL=http://...
+# ── Langfuse (трасування — крок 6) ───────────────
+LANGFUSE_PUBLIC_KEY=       # від ведучого
+LANGFUSE_SECRET_KEY=       # від ведучого
+LANGFUSE_BASEURL=          # від ведучого
+
+# ── MCP Bearer Token (для HTTP сервера — крок 6) ─
+MCP_SECRET=your-secret
+
+# ── AUTO.RIA API (крок 4) ────────────────────────
+AUTO_RIA_SEARCH_URL=       # від ведучого
+AUTO_RIA_USED_URL=         # від ведучого
+AUTO_RIA_NEW_URL=          # від ведучого
+AUTO_RIA_NEW_OPTIONS_URL=  # від ведучого
 ```
 
 <v-click>
 
-**Перевірка:** запустіть `node -e "require('dotenv').config(); console.log(process.env.LITELLM_BASE_URL)"` — має вивести URL.
+**Перевірка:** `node -e "require('dotenv').config(); console.log(process.env.LLM_MODEL)"`
 
 </v-click>
 
 <!--
-Заповніть разом з аудиторією. Скажіть де взяти токени для Langfuse.
-LiteLLM proxy URL — взяти у вас (ведучого).
+Заповніть разом з аудиторією — ведучий диктує значення (не показує URL на екрані).
+Всі ключі потрібні поступово: LiteLLM з кроку 1, Langfuse і AUTO.RIA з кроку 4-6.
+LITELLM_BASE_URL і LITELLM_API_KEY — внутрішній proxy, студенти отримують від вас.
+LANGFUSE_* — також внутрішній instance або langfuse.com (план free доступний).
+MCP_SECRET — студент придумує сам, будь-який рядок.
 -->
 
 ---
@@ -106,18 +118,22 @@ workshop/
   ├── package.json            ← JS залежності
   ├── requirements.txt        ← Python залежності
   │
-  ├── 01-server/              ← Крок 1: MCP сервер
-  │   ├── server.starter.js   ← відкрийте це для написання
-  │   ├── server.js           ← готова версія (reference)
+  ├── 01-server/              ← Крок 1: math сервер (add)
+  │   ├── server.js           ← JS версія
+  │   └── server.py           ← Python версія
+  │
+  ├── 02-server/              ← Крок 4: AUTO.RIA сервер (search_cars)
+  │   ├── server.js           ← JS версія
   │   └── server.py           ← Python версія
   │
   ├── 02-client/              ← Крок 3: MCP клієнт
-  ├── 03-agent-loop/          ← Крок 4: LangChain агент
-  ├── 04-http-server/         ← Крок 6: HTTP сервер
+  ├── 03-agent-loop/          ← Крок 4: LangChain агент (обидва сервери)
+  ├── 04-http-server/         ← Крок 6: HTTP транспорт
   └── 05-langfuse/            ← Крок 6: трасування
 ```
 
 <!--
-Поясніть: .starter.js файли — для написання разом.
-.js без суфіксу — готова версія якщо щось пішло не так.
+Відкрийте кожен файл і показуйте по черзі.
+Кожен файл має детальні коментарі — читаємо разом.
+Запуск через npm run: server, search-server, client, agent, http, traced.
 -->

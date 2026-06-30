@@ -2,242 +2,219 @@
 layout: cover
 ---
 
-# 🧠 Крок 4
-## LangChain Агент + LiteLLM
+# 🧠 Крок 4 — LangChain агент + MCP сервери
 
-Файл: `workshop/03-agent-loop/agent.starter.js`
+`workshop/03-agent-loop/agent.js`  
+`workshop/02-server/server.js`
 
 <!--
-Найцікавіший крок. Агент з MCP і LiteLLM в 20 рядках.
-Відкрийте agent.starter.js на екрані.
+Два файли відкриті паралельно.
+Спочатку показуємо 02-server — що він робить, яка в нього структура.
+Потім agent.js — як агент підключається до двох серверів.
+Далі — підключаємо вже готовий production HTTP сервер через LiteLLM proxy.
 -->
 
 ---
 
-# Кроки побудови агента
+# Підключаємо готовий HTTP сервер
 
+**auto.ria-text-search-mcp** — production MCP сервер, вже запущений:
+
+<div style="transform:scale(0.9); transform-origin:top center; margin-top:-4px; margin-bottom:-40px">
+
+```mermaid
+flowchart LR
+  User["👤 Запит"] --> Agent
+
+  subgraph Agent["🤖 LangChain ReAct Agent"]
+    LLM["🧠 LiteLLM proxy"]
+  end
+
+  Agent -->|stdio| Local["math server\n→ add"]
+  Agent -->|HTTP| Remote["auto.ria-text-search-mcp\n(HTTP, вже запущений)"]
+
+  Agent --> Ans["💬 Відповідь"]
+
+  style Agent fill:#4c1d95,color:#fff
+  style Remote fill:#1e3a5f,color:#fff
 ```
-1. Підключитись до MCP серверу       → MultiServerMCPClient
-2. Отримати список інструментів       → client.getTools()
-3. Налаштувати LLM через LiteLLM     → ChatOpenAI(base_url=...)
-4. Створити ReAct агента             → createReactAgent(llm, tools)
-5. Запустити запит                   → agent.invoke(...)
-6. Закрити MCP з'єднання             → client.close()
-```
+
+</div>
+
+> **auto.ria-text-search-mcp** — production MCP сервер (HTTP), студентам запускати не треба.  
+> **LiteLLM proxy:** корпоративний шлюз — шарить доступ між командою і показує статистику.
 
 <!--
-Пройдіться по кожному кроку спочатку, потім покажіть код.
+auto.ria-text-search-mcp — вже запущений Production MCP сервер.
+Студентам не треба його запускати — просто підключаємось через HTTP.
+Покажіть LiteLLM proxy dashboard: /ui — там видно хто скільки tokens витратив.
+
+Ключові моменти:
+  1. MultiServerMCPClient може підключатись до stdio і HTTP серверів одночасно.
+  2. HTTP сервер авторизація через Bearer token (MCP_SECRET в .env).
+  3. LiteLLM proxy — OpenAI-compatible gateway що ховає реальний LLM endpoint.
 -->
 
 ---
-layout: two-cols
----
 
-# Крок 4.1 — Підключення до MCP
-
-```js {all|1-3|5-12|all}
-// Імпортуємо LangChain MCP адаптер
-import { MultiServerMCPClient } from "@langchain/mcp-adapters";
-
-// Підключаємось до одного або кількох MCP серверів
-const mcpClient = new MultiServerMCPClient({
-  mcpServers: {
-    // Назва = як ми будемо його ідентифікувати
-    workshop: {
-      transport: "stdio",              // stdio транспорт
-      command: "node",                 // запускаємо через node
-      args: ["../01-server/server.js"] // наш сервер
-    }
-  }
-});
-
-// Отримуємо всі інструменти від всіх серверів
-const tools = await mcpClient.getTools();
-console.log("Інструменти:", tools.map(t => t.name));
-// → ["add"]
-```
-
-::right::
-
-# Python
-
-```python
-from langchain_mcp_adapters.client import MultiServerMCPClient
-import asyncio
-
-async def main():
-    # async context manager: підключає і закриває автоматично
-    async with MultiServerMCPClient({
-        "workshop": {
-            "transport": "stdio",
-            "command": "python",
-            "args": ["../01-server/server.py"]
-        }
-    }) as client:
-        # Список інструментів
-        tools = await client.get_tools()
-        print([t.name for t in tools])
-        # → ['add']
-```
-
-<!--
-MultiServerMCPClient -- ключовий клас. Може підключатись до N серверів одночасно.
-Всі їхні tools доступні через getTools().
--->
-
----
-layout: two-cols
----
-
-# Крок 4.2 — LLM та Агент
-
-```js {all|1-2|4-9|11-14|all}
-import { ChatOpenAI } from "@langchain/openai";
-import { createReactAgent } from "@langchain/langgraph/prebuilt";
-
-// LLM через LiteLLM proxy (OpenAI-сумісний)
-const llm = new ChatOpenAI({
-  openAIApiKey: process.env.LITELLM_API_KEY,     // ключ з .env
-  configuration: {
-    baseURL: process.env.LITELLM_BASE_URL,        // URL LiteLLM proxy
-  },
-  model: process.env.LLM_MODEL,                   // назва моделі
-});
-
-// ReAct агент: LLM + інструменти
-// Він сам реалізує Think-Act-Observe луп
-const agent = createReactAgent({ llm, tools });
-```
-
-::right::
-
-# Python
-
-```python
-from langchain_openai import ChatOpenAI
-from langgraph.prebuilt import create_react_agent
-import os
-
-# LLM через LiteLLM
-llm = ChatOpenAI(
-    api_key=os.environ["LITELLM_API_KEY"],
-    base_url=os.environ["LITELLM_BASE_URL"],
-    model=os.environ["LLM_MODEL"],
-)
-
-# ReAct агент
-agent = create_react_agent(llm, tools)
-```
-
-<br>
-
-`createReactAgent` = весь while-loop агентік лупу **в одному рядку**
-
-<!--
-Підкресліть: createReactAgent замінює весь той while(true) loop що ми писали б самі.
-LangChain обробляє tool_use, tool_result, стан messages автоматично.
--->
-
----
-layout: two-cols
----
-
-# Крок 4.3 — Запуск агента
-
-```js {all|1-3|5-8|all}
-// Запускаємо агента з запитом
-const result = await agent.invoke({
-  messages: [{ role: "user", content: "Скільки буде 15 + 27?" }]
-});
-
-// Остання відповідь в масиві messages
-console.log(result.messages.at(-1).content);
-// → "15 + 27 = 42"
-
-// Завжди закриваємо MCP з'єднання!
-await mcpClient.close();
-```
-
-::right::
-
-# Python
-
-```python
-result = await agent.ainvoke({
-    "messages": [
-        {"role": "user", "content": "Скільки буде 15 + 27?"}
-    ]
-})
-
-# Остання відповідь
-print(result["messages"][-1].content)
-# → "15 + 27 = 42"
-```
-
-<br>
-
-Запустіть і перевірте:
+# Тестуємо AUTO.RIA сервер в Inspector
 
 ```bash
-# JS
-node agent.js
-
-# Python
-python agent.py
+npm run inspect-search
 ```
 
+<v-click>
+
+В Inspector → Tools → `search_cars`:
+
+```
+query: "BMW X5 дизель до 20000 доларів"
+limit: 3
+```
+
+Результат — список авто з повними деталями в одному запиті.
+
+</v-click>
+
 <!--
-Запустіть разом. Покажіть що агент викликає add і повертає відповідь.
-Можна спробувати складніший запит: "(3 + 4) * 2" -- агент викличе add двічі.
+Покажіть Inspector з результатом пошуку.
+Зверніть увагу: один виклик → пошук + деталі по кожному авто вже всередині.
 -->
 
 ---
 
-# Весь JS файл (20 рядків)
+# Агент підключається до обох серверів
 
-```js {maxHeight:'380px'}
-// agent.js — LangChain ReAct агент + MCP + LiteLLM
-import "dotenv/config";  // завантажує .env файл
-import { MultiServerMCPClient } from "@langchain/mcp-adapters";
-import { ChatOpenAI } from "@langchain/openai";
-import { createReactAgent } from "@langchain/langgraph/prebuilt";
+<div style="transform:scale(0.65); transform-origin:top center; margin-top:-24px; margin-bottom:-230px">
 
-// 1. Підключення до MCP серверу
-const mcpClient = new MultiServerMCPClient({
+```mermaid
+flowchart TD
+  User["👤 'Знайди BMW X5 до 20000$'"] --> Agent
+
+  subgraph Agent["🤖 LangChain ReAct Agent"]
+    LLM["🧠 LiteLLM proxy"]
+  end
+
+  Agent -->|"tools/list → ['add', 'search_cars', ...]"| MCP
+
+  subgraph MCP["MultiServerMCPClient"]
+    S1["math server (stdio)\n→ add"]
+    S2["auto-ria server (stdio)\n→ search_cars"]
+    S3["auto.ria-text-search (HTTP)\n→ text_search, ..."]
+  end
+
+  MCP -->|"Think → Act → Observe"| Agent
+  Agent --> Ans["💬 Відповідь з результатами"]
+
+  style Agent fill:#4c1d95,color:#fff
+  style MCP fill:#1e3a5f,color:#fff
+  style S3 fill:#1a3a2a,color:#fff
+```
+
+</div>
+
+<!--
+createReactAgent реалізує весь Think-Act-Observe луп автоматично.
+MultiServerMCPClient об'єднує інструменти від ВСІХ серверів (stdio + HTTP) в один список.
+
+Конфіг MultiServerMCPClient для HTTP сервера:
+{
   mcpServers: {
-    workshop: {
-      transport: "stdio",
-      command: "node",
-      args: ["../01-server/server.js"],
-    },
-  },
-});
+    "auto-ria-text": {
+      transport: "http",
+      url: process.env.AUTO_RIA_SEARCH_MCP_URL,
+      headers: { "Authorization": `Bearer ${process.env.MCP_SECRET}` }
+    }
+  }
+}
 
-// 2. Отримуємо інструменти від MCP
-const tools = await mcpClient.getTools();
+Ключовий момент: агент отримує ОДИН список tools від всіх серверів.
+Він не знає (і не повинен знати) звідки кожен tool — stdio чи HTTP.
+-->
 
-// 3. LLM через LiteLLM proxy
-const llm = new ChatOpenAI({
-  openAIApiKey: process.env.LITELLM_API_KEY,
-  configuration: { baseURL: process.env.LITELLM_BASE_URL },
-  model: process.env.LLM_MODEL,
-});
+---
 
-// 4. ReAct агент (сам реалізує Think-Act-Observe луп)
-const agent = createReactAgent({ llm, tools });
+# Запускаємо
 
-// 5. Запит
-const result = await agent.invoke({
-  messages: [{ role: "user", content: "Скільки буде 15 + 27?" }],
-});
+```bash
+npm run agent
+# або: node 03-agent-loop/agent.js
+```
 
-console.log(result.messages.at(-1).content);
+<v-click>
 
-// 6. Закриваємо з'єднання
-await mcpClient.close();
+**В терміналі:**
+```
+Інструменти: ["add", "search_cars"]
+[агент викликає search_cars з query="BMW X5 дизель до 20000 доларів"]
+Ось результати: BMW X5 2018 року, дизель, 19 500$...
+```
+
+</v-click>
+
+<v-click>
+
+**Python:** `python 03-agent-loop/agent.py`
+
+</v-click>
+
+<!--
+Під час виконання показуйте що агент:
+1. Отримав список tools від обох серверів
+2. Вирішив що для цього запиту потрібен search_cars
+3. Отримав результат і сформулював відповідь
+
+Можна спробувати: "Скільки буде 5 + 3?" — агент вибере add.
+Можна спробувати: "Знайди Toyota Camry" — вибере search_cars.
+-->
+
+---
+
+# Ізоляція per-user: окремий агент на юзера
+
+**Проблема:** один агент для всіх → контексти мішаються, дані протікають
+
+```js
+// Зберігаємо окремий агент (+ history) для кожного user
+const sessions = new Map();
+
+async function getSession(userId) {
+  if (!sessions.has(userId)) {
+    const client = new MultiServerMCPClient({ mcpServers: { ... } });
+    const tools = await client.getTools();
+    sessions.set(userId, {
+      agent: createReactAgent({ llm, tools }),
+      history: [],   // ← окрема history розмови
+    });
+  }
+  return sessions.get(userId);
+}
+
+// Використання:
+const { agent, history } = await getSession(req.userId);
+const result = await agent.invoke({ messages: [...history, userMessage] });
+history.push(userMessage, result.messages.at(-1));
 ```
 
 <!--
-Покажіть весь файл цілком.
-Зверніть увагу: import "dotenv/config" -- автоматично завантажує .env.
+Per-user isolation — критично важливо для production агентів.
+
+Без ізоляції:
+  - Один user бачить дані іншого (якщо tools повертають дані з БД без фільтрації)
+  - Контексти розмов мішаються
+  - LLM "пам'ятає" попередні розмови інших users
+
+З ізоляцією:
+  - Кожен user = окремий agent instance + окрема history
+  - MultiServerMCPClient запускається для кожного user окремо
+  - Пам'ять очищується при logout або після timeout
+
+Варіант 2 — простіший (але менш надійний):
+  Передавати userId через system prompt і сподіватись що tools фільтрують самі.
+  Проблема: LLM може ігнорувати системний промпт або tool може не фільтрувати.
+
+Варіант 1 (код вище) — надійніший: ізоляція гарантована архітектурою.
+
+УВАГА: при великій кількості users — думайте про cleanup (видаляти старі сесії).
+sessions.delete(userId) при logout, або TTL через WeakRef/setTimeout.
 -->

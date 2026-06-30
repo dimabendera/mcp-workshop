@@ -136,7 +136,7 @@ layout: cover
 
 # Крок 3: Перший Клієнт
 
-Файл: `workshop/02-client/client.starter.js`
+Файл: `workshop/02-client/client.js`
 
 <!--
 Крок 3 — короткий. Пишемо клієнт щоб показати як це виглядає без Inspector.
@@ -149,7 +149,7 @@ layout: two-cols
 
 # Клієнт: підключення і виклик
 
-```js
+```js {maxHeight:'340px'}
 // client.js — Мінімальний MCP клієнт
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -181,7 +181,7 @@ console.log("5 + 3 =", result.content[0].text);
 
 # Python
 
-```python
+```python {maxHeight:'340px'}
 # client.py
 import asyncio
 from mcp import ClientSession, StdioServerParameters

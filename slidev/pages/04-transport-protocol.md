@@ -44,39 +44,42 @@ layout: two-cols
 <!--
 stdio — для старту. HTTP — коли треба поділитись сервером з командою або деплоїти.
 Сьогодні: stdio (кроки 1-5), HTTP (крок 6).
--->
 
----
+LIFECYCLE З'ЄДНАНЬ:
 
-# Протокол: JSON-RPC 2.0
+stdio:
+  - Кожен клієнт запускає окремий процес сервера.
+  - З'єднання 1:1 (один client ↔ один server процес).
+  - Процес зупиняється коли клієнт відключається.
+  - MultiServerMCPClient запускає окремий процес для КОЖНОГО сервера в конфігу.
 
-Всі повідомлення між клієнтом і сервером — три типи:
+HTTP:
+  - Один сервер обслуговує багато клієнтів.
+  - Стан shared між з'єднаннями (будьте обережні з глобальними змінними!).
+  - Підтримує authentication (Bearer, OAuth) — потрібно якщо сервер публічний.
 
-```json
-// Запит client → server
-{ "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-  "params": { "name": "add", "arguments": { "a": 5, "b": 3 } } }
-```
+PER-USER ISOLATION (як відділити користувачів):
+  Якщо потрібно щоб кожен user мав свій контекст (свій кошик, свої документи):
 
-```json
-// Відповідь server → client
-{ "jsonrpc": "2.0", "id": 1,
-  "result": { "content": [{ "type": "text", "text": "8" }] } }
-```
+  Варіант 1 — окремий agent+client на кожного user:
+    const sessions = new Map();
+    function getSession(userId) {
+      if (!sessions.has(userId)) {
+        const client = new MultiServerMCPClient({...});
+        const tools = await client.getTools();
+        sessions.set(userId, { agent: createReactAgent({llm, tools}), history: [] });
+      }
+      return sessions.get(userId);
+    }
+    // → кожен user має свій окремий agent з окремою history
 
-```json
-// Сповіщення (без відповіді)
-{ "jsonrpc": "2.0", "method": "notifications/tools/list_changed" }
-```
+  Варіант 2 — передавати userId в кожен tool call через system prompt:
+    agent.invoke({ messages: [
+      { role: "system", content: `User ID: ${userId}. Access only their data.` },
+      { role: "user", content: userMessage }
+    ]})
+    // → tool сам фільтрує дані по userId з params або системного промпту
 
-<v-click>
-
-**Нам не потрібно писати JSON-RPC вручну** — SDK повністю ховає цей рівень.
-
-</v-click>
-
-<!--
-JSON-RPC 2.0 — стандартний протокол, існує з 2010-х.
-Показуємо щоб студент розумів що відбувається "під капотом".
-В MCP Inspector можна побачити ці повідомлення в реальному часі.
+  Варіант 2 простіший але потребує що всі tools перевіряють userId.
+  Варіант 1 — надійніший ізоляція але витрачає більше пам'яті.
 -->

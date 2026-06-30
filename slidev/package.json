@@ -5,6 +5,7 @@
   "scripts": {
     "build": "slidev build",
     "dev": "slidev --open",
+    "memory": "slidev slides-memory.md --port 3031 --open",
     "export": "slidev export",
     "export-pptx": "slidev export --format pptx --output mcp-workshop.pptx --template template.pptx"
   },
