@@ -5,7 +5,7 @@
 import "dotenv/config";
 import { MultiServerMCPClient } from "@langchain/mcp-adapters";
 import { ChatOpenAI } from "@langchain/openai";
-import { createReactAgent } from "@langchain/langgraph/prebuilt";
+import { createAgent } from "langchain";
 import { CallbackHandler } from "langfuse-langchain"; // ← 1. Новий імпорт
 
 // 2. Langfuse handler — читає ключі з .env автоматично
@@ -39,7 +39,7 @@ const llm = new ChatOpenAI({
   model: process.env.LLM_MODEL,
 });
 
-const agent = createReactAgent({ llm, tools });
+const agent = createAgent({ model: llm, tools });
 
 // 3. Єдина зміна при виклику — callbacks: [langfuseHandler]
 const result = await agent.invoke(

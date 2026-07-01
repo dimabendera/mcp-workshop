@@ -2,7 +2,7 @@ import "dotenv/config";
 
 import { MultiServerMCPClient } from "@langchain/mcp-adapters";
 import { ChatOpenAI } from "@langchain/openai";
-import { createReactAgent } from "@langchain/langgraph/prebuilt";
+import { createAgent } from "langchain";
 
 const mcpClient = new MultiServerMCPClient({
   mcpServers: {
@@ -31,16 +31,17 @@ const llm = new ChatOpenAI({
   },
 });
 
-const agent = createReactAgent({ llm, tools });
+const agent = createAgent({ model: llm, tools });
 
 const result = await agent.invoke({
   messages: [
     {
       role: "user",
-      content: "Знайди BMW X5 до 50000 доларів",
+      content: "Використовуй інструмент add і додай 19+22+23",
     },
   ],
 });
 
-console.log(result.messages.at(-1)?.content);
+// console.log(result.messages.at(-1)?.content);
+console.log(result.messages);
 await mcpClient.close();

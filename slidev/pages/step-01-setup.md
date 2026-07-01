@@ -75,23 +75,23 @@ cp .env.example .env
 
 ```ini {maxHeight:'220px'}
 # ── LiteLLM Proxy (внутрішній LLM) ───────────────
-LITELLM_BASE_URL=          # від ведучого
-LITELLM_API_KEY=           # від ведучого
-LLM_MODEL=                 # від ведучого
+LITELLM_BASE_URL=          # 
+LITELLM_API_KEY=           # 
+LLM_MODEL=                 # 
 
 # ── Langfuse (трасування — крок 6) ───────────────
-LANGFUSE_PUBLIC_KEY=       # від ведучого
-LANGFUSE_SECRET_KEY=       # від ведучого
-LANGFUSE_BASEURL=          # від ведучого
+LANGFUSE_PUBLIC_KEY=       # 
+LANGFUSE_SECRET_KEY=       # 
+LANGFUSE_BASEURL=          # 
 
 # ── MCP Bearer Token (для HTTP сервера — крок 6) ─
 MCP_SECRET=your-secret
 
 # ── AUTO.RIA API (крок 4) ────────────────────────
-AUTO_RIA_SEARCH_URL=       # від ведучого
-AUTO_RIA_USED_URL=         # від ведучого
-AUTO_RIA_NEW_URL=          # від ведучого
-AUTO_RIA_NEW_OPTIONS_URL=  # від ведучого
+AUTO_RIA_SEARCH_URL=       # 
+AUTO_RIA_USED_URL=         # 
+AUTO_RIA_NEW_URL=          # 
+AUTO_RIA_NEW_OPTIONS_URL=  # 
 ```
 
 <v-click>

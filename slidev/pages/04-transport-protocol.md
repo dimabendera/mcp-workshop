@@ -21,7 +21,7 @@ layout: two-cols
 
 ::right::
 
-# Транспорт: HTTP + SSE
+# Транспорт: Streamable HTTP
 
 **Для віддалених серверів**
 
